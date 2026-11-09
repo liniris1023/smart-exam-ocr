@@ -1,0 +1,10 @@
+{
+  "name": "智慧考卷 OCR 掃描器｜文字型 PDF 轉換系統",
+  "short_name": "智慧考卷OCR",
+  "description": "國小資源班教師專用：拍照、分區、辨識、校對、輸出真正具有文字層的 PDF 與特教報讀 JSON",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#f1f5f9",
+  "theme_color": "#0f766e",
+  "lang": "zh-TW"
+}

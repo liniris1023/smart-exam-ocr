@@ -1,0 +1,697 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#0f766e" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-title" content="智慧考卷OCR" />
+  <title>智慧考卷 OCR 掃描器｜拍照・分區・辨識・校對・文字型 PDF</title>
+  <link rel="manifest" href="./manifest.webmanifest" />
+  <link rel="stylesheet" href="./styles.css" />
+  <!-- 瀏覽器端 PDF 解析 (pdf.js)、HEIC 轉換 (heic2any) 與免費離線/瀏覽器端 OCR (Tesseract.js) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js" defer></script>
+</head>
+<body>
+
+  <!-- ==================== 頂部品牌與 QR Code 導覽列 ==================== -->
+  <header class="app-header">
+    <div class="header-inner">
+      <div class="brand-wrap">
+        <div class="brand-logo" aria-hidden="true">📑</div>
+        <div>
+          <h1 class="brand-title">智慧考卷 OCR 掃描器</h1>
+          <div class="brand-subtitle">拍照・分區・辨識・校對・文字型 PDF（國小資源班特教報讀專用・免登入 AI 帳號）</div>
+        </div>
+      </div>
+      <div class="header-actions">
+        <span class="stage-pill" id="currentStagePill">目前階段：① 拍照上傳</span>
+        <button type="button" class="btn-qr" id="btnOpenQr">
+          <span>📱 網站 QR Code</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- ==================== 六步驟流程切換列 ==================== -->
+  <nav class="stepper-bar" aria-label="考卷處理六大步驟">
+    <div class="stepper-inner">
+      <button type="button" class="step-tab active" data-step="1">
+        <span class="step-num">①</span> <span>拍照上傳</span>
+      </button>
+      <button type="button" class="step-tab" data-step="2">
+        <span class="step-num">②</span> <span>照片校正</span>
+      </button>
+      <button type="button" class="step-tab" data-step="3">
+        <span class="step-num">③</span> <span>考卷分區</span>
+      </button>
+      <button type="button" class="step-tab" data-step="4">
+        <span class="step-num">④</span> <span>智慧辨識</span>
+      </button>
+      <button type="button" class="step-tab" data-step="5">
+        <span class="step-num">⑤</span> <span>文字校對</span>
+      </button>
+      <button type="button" class="step-tab" data-step="6">
+        <span class="step-num">⑥</span> <span>匯出 PDF</span>
+      </button>
+    </div>
+  </nav>
+
+  <!-- ==================== 主內容容器 ==================== -->
+  <main class="main-container">
+
+    <!-- 多頁考卷快速切換條 -->
+    <div class="card" style="padding:12px 18px;margin-bottom:14px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+        <div class="pages-strip" id="pagesStrip"></div>
+        <label class="btn btn-sm btn-outline" style="cursor:pointer;">
+          ➕ 新增考卷頁（JPG/PNG/HEIC/PDF）
+          <input type="file" id="fileUploadInput" accept=".jpg,.jpeg,.png,.heic,.heif,.pdf,image/*,application/pdf" multiple style="display:none;" />
+        </label>
+      </div>
+    </div>
+
+    <!-- =====================================================================
+         步驟 ①：拍照上傳與測試考卷範本庫
+         ===================================================================== -->
+    <section class="step-panel active" data-step="1">
+      <div class="card">
+        <div class="card-header">
+          <h2 class="card-title">📸 步驟 ①：平板直接開啟相機拍照或匯入考卷檔案</h2>
+          <span class="sample-badge">無須登入 ChatGPT 或任何帳號即可直接使用</span>
+        </div>
+
+        <div class="upload-hero-grid">
+          <!-- 平板即時取景拍照 -->
+          <div class="hero-action-box camera-box" id="btnOpenWebCamera" role="button" tabindex="0">
+            <div class="hero-icon">📷</div>
+            <div class="hero-title">開啟平板／電腦相機直接拍照</div>
+            <div class="hero-desc">支援 iPad、Android 平板後鏡頭取景對齊考卷邊框拍攝</div>
+            <span class="btn btn-primary" style="margin-top:6px;">立即開啟相機</span>
+          </div>
+
+          <!-- 原生系統相機直拍 (iPad / 手機原生高畫質快門) -->
+          <label class="hero-action-box">
+            <div class="hero-icon">📱</div>
+            <div class="hero-title">呼叫平板原生相機快門</div>
+            <div class="hero-desc">直接使用 iOS / Android 系統內建高畫質相機拍攝考卷</div>
+            <span class="btn btn-accent" style="margin-top:6px;">原生相機拍攝</span>
+            <input type="file" id="nativeCameraInput" accept="image/*" capture="environment" style="display:none;" />
+          </label>
+
+          <!-- 匯入 JPG / PNG / HEIC / PDF -->
+          <label class="hero-action-box" for="fileUploadInput">
+            <div class="hero-icon">📂</div>
+            <div class="hero-title">匯入 JPG、PNG、HEIC 或 PDF 考卷</div>
+            <div class="hero-desc">支援多頁考卷圖片、蘋果 iPad HEIC 照片與既有 PDF 考卷匯入</div>
+            <span class="btn btn-outline" style="margin-top:6px;">選擇檔案匯入</span>
+          </label>
+        </div>
+      </div>
+
+      <!-- 內建 6 組完整國小考卷測試範本庫（含最核心驗收情境） -->
+      <div class="card">
+        <div class="card-header">
+          <h2 class="card-title">🧪 內建國小考卷測試資料與核心驗收情境（點擊即可載入實測）</h2>
+          <button type="button" class="btn btn-sm btn-purple" id="btnLoadMismergedDemo">
+            ⚡ 載入「某區塊分錯 → 教師用手指畫線修改」核心驗收情境
+          </button>
+        </div>
+
+        <div class="sample-grid">
+          <div class="sample-card featured">
+            <div>
+              <span class="sample-badge">🎯 核心驗收情境（預設載入）</span>
+              <h3 style="margin:8px 0 4px;font-size:1.12rem;">國小國語混合排版考卷（左欄第一大題・右欄第二大題・下方第三大題）</h3>
+              <p style="font-size:0.93rem;color:var(--text-muted);">
+                左邊是第一大題（第1~3題含注音），右邊是第二大題（第4~6題），下方跨欄是第三大題（第7~8題含算式與書包插圖）。
+              </p>
+            </div>
+            <button type="button" class="btn btn-primary btn-sm" data-sample-id="acceptance_mixed">載入此驗收考卷並進入分區 ➡️</button>
+          </div>
+
+          <div class="sample-card">
+            <div>
+              <span class="sample-badge">◫ 測試 2：左右雙欄考卷</span>
+              <h3 style="margin:8px 0 4px;font-size:1.12rem;">左右雙欄考卷（左欄第 1~3 題・右欄第 6~8 題）</h3>
+              <p style="font-size:0.93rem;color:var(--text-muted);">
+                自動找出左右欄分界，先由上至下辨識左欄第 1~3 題，再辨識右欄第 6~8 題，題目與注音絕不跨欄混合。
+              </p>
+            </div>
+            <button type="button" class="btn btn-outline btn-sm" data-sample-id="two_col">載入左右雙欄考卷 ➡️</button>
+          </div>
+
+          <div class="sample-card">
+            <div>
+              <span class="sample-badge">⊟ 測試 3：上下分區考卷</span>
+              <h3 style="margin:8px 0 4px;font-size:1.12rem;">上下分區考卷（上半部第一大題・水平分隔線・下半部第二大題）</h3>
+              <p style="font-size:0.93rem;color:var(--text-muted);">
+                自動偵測水平分隔線，將上下大題獨立處理，避免不同大題文字接在一起。
+              </p>
+            </div>
+            <button type="button" class="btn btn-outline btn-sm" data-sample-id="top_bottom">載入上下分區考卷 ➡️</button>
+          </div>
+
+          <div class="sample-card">
+            <div>
+              <span class="sample-badge">📄 測試 1：單欄考卷</span>
+              <h3 style="margin:8px 0 4px;font-size:1.12rem;">單欄標準考卷（國小三年級自然科測驗）</h3>
+              <p style="font-size:0.93rem;color:var(--text-muted);">
+                標準單欄由上而下題目與選項 A/B/C/D 排列辨識。
+              </p>
+            </div>
+            <button type="button" class="btn btn-outline btn-sm" data-sample-id="single_col">載入單欄考卷 ➡️</button>
+          </div>
+
+          <div class="sample-card">
+            <div>
+              <span class="sample-badge">ㄅㄆ 測試 5：國語注音與低信心標示</span>
+              <h3 style="margin:8px 0 4px;font-size:1.12rem;">具有細小注音與聲調的國語考卷（含低信心度錯字標示）</h3>
+              <p style="font-size:0.93rem;color:var(--text-muted);">
+                測試注音符號（ㄅㄆㄇㄈˊˇˋ˙）保留，並以醒目紅框標示低信心文字供教師修正。
+              </p>
+            </div>
+            <button type="button" class="btn btn-outline btn-sm" data-sample-id="zhuyin_special">載入國語注音考卷 ➡️</button>
+          </div>
+
+          <div class="sample-card">
+            <div>
+              <span class="sample-badge">➗ 測試 6：數學算式與表格</span>
+              <h3 style="margin:8px 0 4px;font-size:1.12rem;">具有四則運算、直式算式與統計表格的數學考卷</h3>
+              <p style="font-size:0.93rem;color:var(--text-muted);">
+                測試數學符號（＋－×÷＝）、直式應用題與多欄統計表格辨識與向量表格 PDF 輸出。
+              </p>
+            </div>
+            <button type="button" class="btn btn-outline btn-sm" data-sample-id="math_table">載入數學與表格考卷 ➡️</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- =====================================================================
+         步驟 ②：照片校正（自動偵測紙張邊界、透視校正、旋轉、去陰影、保留細小注音）
+         ===================================================================== -->
+    <section class="step-panel" data-step="2">
+      <div id="qualityBanner" class="quality-banner good"></div>
+
+      <div class="workspace-layout">
+        <!-- 左側影像處理控制面板 -->
+        <aside class="toolbar-panel">
+          <div class="tool-group">
+            <div class="tool-group-title">📐 紙張邊界與透視變形修正</div>
+            <p style="font-size:0.9rem;color:var(--text-muted);margin-bottom:10px;">
+              可直接在右側考卷圖上用手指拖曳「左上、右上、右下、左下」四個圓點對齊考卷四角，再點選透視裁切。
+            </p>
+            <div class="tool-buttons-grid">
+              <button type="button" class="btn btn-sm btn-outline" id="btnAutoDetectQuad">🪄 自動偵測邊界</button>
+              <button type="button" class="btn btn-sm btn-primary" id="btnApplyPerspective">📐 套用透視裁切</button>
+            </div>
+          </div>
+
+          <div class="tool-group">
+            <div class="tool-group-title">🔄 旋轉與方向校正</div>
+            <div class="tool-buttons-grid">
+              <button type="button" class="btn btn-sm btn-outline" id="btnRotateLeft">↺ 左轉 90°</button>
+              <button type="button" class="btn btn-sm btn-outline" id="btnRotateRight">↻ 右轉 90°</button>
+            </div>
+          </div>
+
+          <div class="tool-group">
+            <div class="tool-group-title">✨ 影像強化與保留細小注音</div>
+            <div style="margin-bottom:10px;">
+              <label class="field-label">亮度調整 (<span id="valBrightness">0</span>)</label>
+              <input type="range" id="rngBrightness" min="-40" max="40" step="2" value="0" style="width:100%;" />
+            </div>
+            <div style="margin-bottom:10px;">
+              <label class="field-label">對比度強化 (<span id="valContrast">20</span>)</label>
+              <input type="range" id="rngContrast" min="-20" max="60" step="2" value="20" style="width:100%;" />
+            </div>
+            <div style="margin-bottom:10px;">
+              <label class="field-label">文字與注音銳利化 (<span id="valSharpen">0.5</span>)</label>
+              <input type="range" id="rngSharpen" min="0" max="1.4" step="0.1" value="0.5" style="width:100%;" />
+            </div>
+            <div style="margin-bottom:10px;">
+              <label style="display:flex;align-items:center;gap:8px;font-weight:700;cursor:pointer;">
+                <input type="checkbox" id="chkRemoveShadow" checked /> ☀️ 自動去除桌面與手部陰影
+              </label>
+            </div>
+            <div style="margin-bottom:10px;">
+              <label style="display:flex;align-items:center;gap:8px;font-weight:700;cursor:pointer;">
+                <input type="checkbox" id="chkBwMode" /> ⚫ 高對比黑白二值化模式
+              </label>
+            </div>
+            <div>
+              <label class="field-label">🔍 區塊圖片超解析放大辨識倍率</label>
+              <select id="selUpscale" class="select-box">
+                <option value="1">1.0x 原尺寸辨識</option>
+                <option value="1.5" selected>1.5x 智慧放大（推薦：兼顧速度與注音清晰）</option>
+                <option value="2">2.0x 超解析放大（適合細小注音與低畫質照片）</option>
+              </select>
+            </div>
+          </div>
+        </aside>
+
+        <!-- 右側互動預覽畫布 -->
+        <div class="canvas-stage-wrapper">
+          <div style="color:#e2e8f0;font-weight:700;margin-bottom:10px;">
+            👆 手指拖曳四個綠色端點可微調紙張邊界，完成後點擊前往「③ 考卷分區」
+          </div>
+          <canvas id="preprocessCanvas" class="interactive-canvas"></canvas>
+        </div>
+      </div>
+    </section>
+
+    <!-- =====================================================================
+         步驟 ③：考卷分區（自動左右分欄與上下分區＋教師手動畫線、框選、調順序、合併拆分）
+         ===================================================================== -->
+    <section class="step-panel" data-step="3">
+      <div class="workspace-layout">
+        <!-- 左側手動畫線與框選工具箱 -->
+        <aside class="toolbar-panel">
+          <div class="tool-group">
+            <div class="tool-group-title">✍️ 教師手動畫線與框選工具</div>
+            <div style="display:flex;flex-direction:column;gap:8px;">
+              <button type="button" class="btn btn-sm btn-outline active-tool" data-tool="select">
+                ✋ 4. 選取／移動／縮放辨識框與分隔線
+              </button>
+              <button type="button" class="btn btn-sm btn-outline" data-tool="vline">
+                ┃ 1. 畫直線（分隔左右欄：先左欄後右欄）
+              </button>
+              <button type="button" class="btn btn-sm btn-outline" data-tool="hline">
+                ━ 2. 畫橫線（分隔上下大題區域）
+              </button>
+              <button type="button" class="btn btn-sm btn-outline" data-tool="drawbox">
+                ➕ 3. 自由框選（手指拖曳新增題目框）
+              </button>
+              <button type="button" class="btn btn-sm btn-outline" data-tool="order">
+                🔢 5. 點擊依序編號（依序點框設為 1, 2, 3...）
+              </button>
+            </div>
+            <div style="margin-top:8px;">
+              <label class="field-label">自由框選時預設區塊類型：</label>
+              <select id="selNewBoxType" class="select-box">
+                <option value="question">🔵 一般題幹與選項</option>
+                <option value="section">🟣 大題標題</option>
+                <option value="zhuyin">🟢 國語注音題</option>
+                <option value="math">🟠 數學算式/直式</option>
+                <option value="table">🟩 表格區塊</option>
+                <option value="illustration">🌹 插圖保留區</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- 選取區塊之單獨重辨識、合併、拆分檢視器 -->
+          <div class="tool-group" id="selectedBlockInspector"></div>
+
+          <!-- 復原、重做、清除分隔線、重新自動分區 -->
+          <div class="tool-group">
+            <div class="tool-group-title">🛠️ 版面還原與重設</div>
+            <div class="tool-buttons-grid">
+              <button type="button" class="btn btn-sm btn-outline" id="btnUndo">↩️ 復原</button>
+              <button type="button" class="btn btn-sm btn-outline" id="btnRedo">↪️ 重做</button>
+              <button type="button" class="btn btn-sm btn-outline" id="btnClearDividers">🧹 清除分隔線</button>
+              <button type="button" class="btn btn-sm btn-outline" id="btnAutoLayoutReanalyze">🤖 自動重分析</button>
+            </div>
+            <button type="button" class="btn btn-sm btn-purple" id="btnSimMismergedInStep3" style="width:100%;margin-top:8px;">
+              ⚡ 模擬「某區塊分錯需畫直線修改」驗收情境
+            </button>
+          </div>
+        </aside>
+
+        <!-- 右側考卷分區互動畫布 -->
+        <div class="canvas-stage-wrapper">
+          <div class="canvas-zoom-bar">
+            <span>🔍 畫布縮放：</span>
+            <button type="button" class="btn btn-sm btn-outline" id="btnZoomOut" style="min-height:32px;padding:2px 10px;">➖</button>
+            <span id="zoomLevelLabel" style="font-weight:800;min-width:48px;text-align:center;">100%</span>
+            <button type="button" class="btn btn-sm btn-outline" id="btnZoomIn" style="min-height:32px;padding:2px 10px;">➕</button>
+            <button type="button" class="btn btn-sm btn-outline" id="btnZoomReset" style="min-height:32px;padding:2px 10px;">適應畫面</button>
+            <span style="font-size:0.86rem;color:#cbd5e1;margin-left:8px;">
+              （紫線＝左右分欄線、紅線＝上下分區線；可直接拖曳線條或框角調整）
+            </span>
+          </div>
+          <canvas id="layoutCanvas" class="interactive-canvas"></canvas>
+        </div>
+      </div>
+    </section>
+
+    <!-- =====================================================================
+         步驟 ④：智慧辨識（一般免費瀏覽器模式 vs 高精度後端模式、逐區進度與架構說明）
+         ===================================================================== -->
+    <section class="step-panel" data-step="4">
+      <div class="card">
+        <div class="card-header">
+          <h2 class="card-title">🧠 步驟 ④：執行逐區塊智慧 OCR 辨識</h2>
+          <div id="ocrSummaryStats"></div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px;margin-bottom:18px;">
+          <!-- 一般模式 -->
+          <label class="sample-card featured" style="cursor:pointer;">
+            <div style="display:flex;align-items:center;gap:10px;">
+              <input type="radio" name="ocrModeRadio" value="browser" checked style="width:22px;height:22px;" />
+              <span class="sample-badge">🟢 一般模式（預設・免登入・完全免費）</span>
+            </div>
+            <h3 style="font-size:1.15rem;">瀏覽器端智慧版面裁切 ＋ Tesseract.js 繁中光學辨識</h3>
+            <p style="font-size:0.93rem;color:var(--text-muted);">
+              完全在平板／電腦瀏覽器內依分區順序逐塊放大辨識，資料不離開本機，無須任何帳號或 API 費用。對辨識信心度低於 80% 的區塊自動加註醒目紅框提醒人工確認。
+            </p>
+          </label>
+
+          <!-- 高精度模式 -->
+          <label class="sample-card" style="cursor:pointer;">
+            <div style="display:flex;align-items:center;gap:10px;">
+              <input type="radio" name="ocrModeRadio" value="backend" style="width:22px;height:22px;" />
+              <span class="sample-badge" style="background:var(--purple-soft);color:var(--purple);">🟣 高精度模式（Python PaddleOCR 後端服務）</span>
+            </div>
+            <h3 style="font-size:1.15rem;">連接具備 PP-StructureV2 版面分析之 PaddleOCR 後端</h3>
+            <p style="font-size:0.93rem;color:var(--text-muted);">
+              傳送裁切區塊至專案隨附之 Python FastAPI + PaddleOCR 後端伺服器（可部署於學校主機、Docker、Render 或 HuggingFace Spaces），針對複雜直排注音與手寫算式提供最高精度辨識。
+            </p>
+          </label>
+        </div>
+
+        <!-- 後端網址設定面板 -->
+        <div id="backendConfigPanel" style="display:none;background:#f8fafc;border:2px solid #cbd5e1;border-radius:14px;padding:16px;margin-bottom:16px;">
+          <label class="field-label">🔗 高精度 PaddleOCR 後端 API 端點網址（專案已提供完整 <code>smart-exam-ocr-backend/server.py</code> 原始碼）：</label>
+          <input type="text" id="inpBackendUrl" class="input-text" value="http://localhost:8000/api/ocr" />
+          <p style="font-size:0.88rem;color:var(--text-muted);margin-top:6px;">
+            💡 若後端伺服器未啟動，系統會自動無縫切換回「瀏覽器端免費辨識模式」，確保教學現場永不中斷。
+          </p>
+        </div>
+
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:16px;">
+          <label style="display:inline-flex;align-items:center;gap:8px;font-weight:700;cursor:pointer;">
+            <input type="checkbox" id="chkForceLiveTesseract" />
+            🔬 強制對所有區塊重新執行即時 Tesseract.js 光學掃描（實拍照片會自動啟用）
+          </label>
+          <button type="button" class="btn btn-primary" id="btnStartBatchOcr" style="min-width:260px;font-size:1.12rem;">
+            🚀 開始逐區塊執行 OCR 辨識 ➡️
+          </button>
+        </div>
+
+        <!-- 進度條 -->
+        <div id="ocrProgressWrap" style="display:none;background:#f1f5f9;border-radius:14px;padding:16px;">
+          <div id="ocrProgressText" style="font-weight:800;color:var(--primary);margin-bottom:8px;">正在準備辨識...</div>
+          <div style="width:100%;height:18px;background:#cbd5e1;border-radius:999px;overflow:hidden;">
+            <div id="ocrProgressBar" style="width:0%;height:100%;background:linear-gradient(90deg,#0f766e,#2563eb);transition:width 0.2s ease;"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 第十二節要求：清楚區分四類技術規格、部署方式、費用與資料傳輸說明 -->
+      <div class="card">
+        <div class="card-header">
+          <h3 class="card-title">📋 技術執行模式、費用與資料隱私透明說明（對應第十二節規範）</h3>
+        </div>
+        <table class="spec-table">
+          <thead>
+            <tr>
+              <th>功能分類</th>
+              <th>包含功能項目</th>
+              <th>費用與帳號需求</th>
+              <th>資料傳輸與隱私情況</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>1. 完全可在瀏覽器執行的功能</strong></td>
+              <td>相機拍照、JPG/PNG/HEIC/PDF 匯入、紙張四角透視校正、去陰影銳利化、XY-Cut 自動分欄分區、手動畫線框選、閱讀順序調整、文字校對、模式 A/B 真正文字型 PDF 產生、TXT/JSON 匯出、網站 QR Code</td>
+              <td><strong>完全免費（NT$ 0）</strong><br/>免登入 ChatGPT 或任何帳號</td>
+              <td>100% 在教師平板／電腦瀏覽器記憶體內運算，考卷影像與學生資料<strong>絕不外傳</strong>。</td>
+            </tr>
+            <tr>
+              <td><strong>2. 需要網路連線的功能</strong></td>
+              <td>首次開啟網站載入網頁程式、內嵌繁中注音字型（<code>Iansui-Exam.ttf</code>）與 Tesseract.js 繁中語言包（載入後即由瀏覽器快取）</td>
+              <td><strong>完全免費（NT$ 0）</strong><br/>託管於 GitHub Pages CDN</td>
+              <td>僅從 HTTPS 靜態伺服器下載字型與前端腳本，不上傳使用者照片。</td>
+            </tr>
+            <tr>
+              <td><strong>3. 需要後端伺服器的功能（選用）</strong></td>
+              <td>高精度模式：Python FastAPI + PaddleOCR (<code>PP-OCRv4</code> + <code>PP-StructureV2</code>) 版面與繁中注音深度辨識服務（見 <code>smart-exam-ocr-backend/</code>）</td>
+              <td><strong>開源免費軟體</strong><br/>可免費部署於學校電腦、Docker 或雲端容器</td>
+              <td>僅在教師主動切換至「高精度後端模式」時，將單一裁切區塊傳送至教師指定的自建後端網址，辨識完立即釋放不留存。</td>
+            </tr>
+            <tr>
+              <td><strong>4. 需要付費 OCR API 的功能（選用擴充）</strong></td>
+              <td>後端支援可選掛接 Google Cloud Vision / Gemini API 進行極端潦草手寫考卷辨識</td>
+              <td>依雲端商免費額度或用量計費（非必備，預設不啟用）</td>
+              <td>除非機構自行在後端設定 API 金鑰，否則系統預設完全不呼叫任何商業付費 API。</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- =====================================================================
+         步驟 ⑤：文字校對（原始考卷與辨識文字左右同步對照、直向分頁切換、改錯字、調順序、閱讀順序預覽）
+         ===================================================================== -->
+    <section class="step-panel" data-step="5">
+      <div class="card" style="padding:16px 20px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;">
+          <!-- 平板橫向／直向檢視模式切換 -->
+          <div class="proofread-view-switcher" style="margin:0;">
+            <button type="button" class="btn btn-sm btn-outline active-tool" data-proof-view="split">◫ 左右對照模式（平板橫向推薦）</button>
+            <button type="button" class="btn btn-sm btn-outline" data-proof-view="image">🖼️ 單看原始考卷（平板直向切換）</button>
+            <button type="button" class="btn btn-sm btn-outline" data-proof-view="text">📝 單看辨識文字（平板直向切換）</button>
+          </div>
+
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+            <button type="button" class="btn btn-sm btn-outline" id="btnAddQuestionManual">➕ 新增遺漏題目</button>
+            <button type="button" class="btn btn-sm btn-accent" id="btnOpenReadingPreview">👁️ 閱讀順序預覽＆語音試聽</button>
+            <button type="button" class="btn btn-sm btn-primary" id="btnSaveProofVersion">💾 儲存為目前版本</button>
+            <span id="savedVersionStatus" style="font-size:0.88rem;color:var(--success);font-weight:800;"></span>
+          </div>
+        </div>
+
+        <!-- 國小注音符號與數學符號快速輸入觸控盤 -->
+        <details style="margin-top:12px;">
+          <summary style="cursor:pointer;font-weight:800;color:var(--primary);">
+            ⌨️ 點此展開「國小注音符號（ㄅㄆㄇㄈˊˇˋ˙）與數學符號（＋－×÷＝①②③④）」平板快速輸入盤
+          </summary>
+          <div class="symbol-keypad">
+            <button type="button" class="key-btn">ㄅ</button><button type="button" class="key-btn">ㄆ</button><button type="button" class="key-btn">ㄇ</button><button type="button" class="key-btn">ㄈ</button>
+            <button type="button" class="key-btn">ㄉ</button><button type="button" class="key-btn">ㄊ</button><button type="button" class="key-btn">ㄋ</button><button type="button" class="key-btn">ㄌ</button>
+            <button type="button" class="key-btn">ㄍ</button><button type="button" class="key-btn">ㄎ</button><button type="button" class="key-btn">ㄏ</button><button type="button" class="key-btn">ㄐ</button>
+            <button type="button" class="key-btn">ㄑ</button><button type="button" class="key-btn">ㄒ</button><button type="button" class="key-btn">ㄓ</button><button type="button" class="key-btn">ㄔ</button>
+            <button type="button" class="key-btn">ㄕ</button><button type="button" class="key-btn">ㄖ</button><button type="button" class="key-btn">ㄗ</button><button type="button" class="key-btn">ㄘ</button>
+            <button type="button" class="key-btn">ㄙ</button><button type="button" class="key-btn">ㄧ</button><button type="button" class="key-btn">ㄨ</button><button type="button" class="key-btn">ㄩ</button>
+            <button type="button" class="key-btn">ㄚ</button><button type="button" class="key-btn">ㄛ</button><button type="button" class="key-btn">ㄜ</button><button type="button" class="key-btn">ㄝ</button>
+            <button type="button" class="key-btn">ㄞ</button><button type="button" class="key-btn">ㄟ</button><button type="button" class="key-btn">ㄠ</button><button type="button" class="key-btn">ㄡ</button>
+            <button type="button" class="key-btn">ㄢ</button><button type="button" class="key-btn">ㄣ</button><button type="button" class="key-btn">ㄤ</button><button type="button" class="key-btn">ㄥ</button>
+            <button type="button" class="key-btn">ㄦ</button><button type="button" class="key-btn">ˊ</button><button type="button" class="key-btn">ˇ</button><button type="button" class="key-btn">ˋ</button>
+            <button type="button" class="key-btn">˙</button><button type="button" class="key-btn">＋</button><button type="button" class="key-btn">－</button><button type="button" class="key-btn">×</button>
+            <button type="button" class="key-btn">÷</button><button type="button" class="key-btn">＝</button><button type="button" class="key-btn">（　）</button><button type="button" class="key-btn">□</button>
+            <button type="button" class="key-btn">①</button><button type="button" class="key-btn">②</button><button type="button" class="key-btn">③</button><button type="button" class="key-btn">④</button>
+          </div>
+        </details>
+      </div>
+
+      <!-- 左右對照雙欄容器 -->
+      <div class="proofread-split" id="proofSplitContainer">
+        <!-- 左側：原始考卷點擊同步定位 -->
+        <div class="proofread-left">
+          <div style="color:#e2e8f0;font-weight:700;margin-bottom:8px;font-size:0.95rem;">
+            👆 點擊原始考卷上的任一題框，右側會自動捲動並定位至該題文字卡片
+          </div>
+          <canvas id="proofCanvas" class="interactive-canvas" style="cursor:pointer;"></canvas>
+        </div>
+
+        <!-- 右側：結構化題目與選項校對清單 -->
+        <div class="proofread-right" id="proofCardsContainer"></div>
+      </div>
+    </section>
+
+    <!-- =====================================================================
+         步驟 ⑥：匯出真正文字型 PDF（模式 A / 模式 B）、TXT 與特教報讀 JSON
+         ===================================================================== -->
+    <section class="step-panel" data-step="6">
+      <div class="card">
+        <div class="card-header">
+          <h2 class="card-title">📄 步驟 ⑥：輸出真正可選取、搜尋、複製的文字型 PDF 與特教報讀結構檔</h2>
+          <span class="sample-badge">內嵌臺灣教育部標準繁體中文與注音 TrueType 字型＋完整 /ToUnicode CMap</span>
+        </div>
+
+        <div class="field-grid" style="margin-bottom:18px;">
+          <div>
+            <label class="field-label">📌 考卷檔案標題（顯示於 PDF 頁首與匯出檔名）</label>
+            <input type="text" id="exportExamTitle" class="input-text" value="國小三年級國語期中評量考卷" />
+          </div>
+          <div>
+            <label class="field-label">🔠 模式 B 重排 PDF 字體大小（支援特教放大字體）</label>
+            <select id="selPdfFontSize" class="select-box">
+              <option value="14">14 pt（一般標準考卷字體）</option>
+              <option value="16" selected>16 pt（資源班特教大字體・推薦）</option>
+              <option value="18">18 pt（特大清晰字體）</option>
+              <option value="22">22 pt（低視能學生放大字體）</option>
+            </select>
+          </div>
+          <div>
+            <label class="field-label">↕️ 模式 B 行距設定</label>
+            <select id="selPdfLineSpacing" class="select-box">
+              <option value="1.5">1.5 倍行距</option>
+              <option value="1.65" selected>1.65 倍舒適行距（推薦）</option>
+              <option value="2.0">2.0 倍寬鬆行距</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="upload-hero-grid">
+          <!-- 模式 B：重新排版文字型 PDF（優先開發與驗收模式） -->
+          <div class="sample-card featured" style="border-width:3px;">
+            <div>
+              <span class="sample-badge">🏆 模式 B：優先驗收模式（A4 直式重新排版）</span>
+              <h3 style="margin:10px 0 6px;font-size:1.25rem;">重新排版文字型 PDF</h3>
+              <ul style="font-size:0.94rem;color:var(--text-muted);padding-left:20px;line-height:1.6;">
+                <li>使用<strong>真正的 PDF 文字物件 (<code>BT ... Tj ET</code>)</strong>，絕非圖片截圖</li>
+                <li>嵌入繁體中文、注音符號（ㄅㄆㄇㄈˊˇˋ˙）與數學符號字型</li>
+                <li>嚴格依照校對後的<strong>大題、小題及選項順序</strong>由上至下編排</li>
+                <li>自動保留考卷<strong>相關插圖</strong>與<strong>向量格線表格</strong></li>
+                <li>無論報讀系統依「PDF 串流順序」或「Y 座標順序」擷取，閱讀順序皆 100% 正確！</li>
+              </ul>
+            </div>
+            <button type="button" class="btn btn-primary" id="btnExportPdfModeB" style="width:100%;margin-top:12px;font-size:1.1rem;">
+              ⬇️ 下載「模式 B：重新排版文字型 PDF」
+            </button>
+          </div>
+
+          <!-- 模式 A：原稿保留 PDF -->
+          <div class="sample-card" style="border-width:2px;">
+            <div>
+              <span class="sample-badge" style="background:var(--accent-soft);color:var(--accent);">🖼️ 模式 A：原稿保留＋可搜尋文字層</span>
+              <h3 style="margin:10px 0 6px;font-size:1.25rem;">原稿保留文字層 PDF</h3>
+              <ul style="font-size:0.94rem;color:var(--text-muted);padding-left:20px;line-height:1.6;">
+                <li>完整保留紙本考卷原始／清晰化背景圖片</li>
+                <li>於對應圖片文字座標位置加入<strong>可選取、複製、搜尋的 Unicode 文字層</strong></li>
+                <li>支援中文 Unicode 與注音座標對齊</li>
+              </ul>
+              <label style="display:flex;align-items:center;gap:8px;margin-top:10px;font-size:0.92rem;font-weight:700;cursor:pointer;">
+                <input type="checkbox" id="chkModeAVisibleOverlay" />
+                顯示半透明紅色對照文字層（勾選可檢視文字對齊座標；不勾選為標準隱形可選取文字層）
+              </label>
+            </div>
+            <button type="button" class="btn btn-accent" id="btnExportPdfModeA" style="width:100%;margin-top:12px;">
+              ⬇️ 下載「模式 A：原稿保留文字層 PDF」
+            </button>
+          </div>
+
+          <!-- 結構化 JSON 與 TXT 匯出 -->
+          <div class="sample-card" style="border-width:2px;">
+            <div>
+              <span class="sample-badge" style="background:var(--purple-soft);color:var(--purple);">🔊 特教報讀系統串接專用</span>
+              <h3 style="margin:10px 0 6px;font-size:1.25rem;">匯出結構化 JSON 與 TXT</h3>
+              <p style="font-size:0.94rem;color:var(--text-muted);line-height:1.6;">
+                明確區分：<strong>大題編號、大題名稱、小題編號、題幹文字、選項陣列 (A/B/C/D)、注音內容、數學算式、插圖與閱讀順序</strong>，可直接匯入 Claude 製作的報讀網站或評量報讀系統。
+              </p>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:8px;margin-top:12px;">
+              <button type="button" class="btn btn-purple" id="btnExportJson">⬇️ 下載特教報讀結構 JSON (.json)</button>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+                <button type="button" class="btn btn-sm btn-outline" id="btnExportTxt">⬇️ 下載純文字 (.txt)</button>
+                <button type="button" class="btn btn-sm btn-outline" id="btnCopyJsonText">📋 複製 JSON</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 內建 PDF 真實文字層與閱讀順序實測驗證器 -->
+        <div id="pdfVerifyResultBox" style="display:none;margin-top:18px;padding:16px;border-radius:14px;border:2px solid #86efac;background:#f0fdf4;"></div>
+      </div>
+
+      <!-- 結構化 JSON 與 TXT 即時預覽 -->
+      <div class="card">
+        <div class="card-header">
+          <h3 class="card-title">🔍 結構化報讀資料即時預覽（JSON 題幹與選項分離結構 ／ TXT 報讀順序）</h3>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px;">
+          <div>
+            <label class="field-label">📦 特教報讀 JSON 結構預覽（含大題、小題、題幹、選項陣列、注音、算式、閱讀順序）</label>
+            <textarea id="exportJsonPreview" class="textarea-text" rows="14" readonly style="font-family:monospace;font-size:0.9rem;background:#f8fafc;"></textarea>
+          </div>
+          <div>
+            <label class="field-label">📄 純文字 TXT 閱讀順序預覽</label>
+            <textarea id="exportTxtPreview" class="textarea-text" rows="14" readonly style="font-size:0.96rem;background:#f8fafc;"></textarea>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ==================== 底部固定步驟切換列 ==================== -->
+  <footer class="bottom-nav-bar">
+    <div class="bottom-nav-inner">
+      <button type="button" class="btn btn-outline" id="btnPrevStep" style="visibility:hidden;">⬅️ 返回上一步</button>
+      <div style="font-size:0.92rem;color:var(--text-muted);font-weight:700;text-align:center;">
+        💡 各步驟可隨時返回上一頁修改，系統自動保留目前工作進度與手動畫線內容
+      </div>
+      <button type="button" class="btn btn-primary" id="btnNextStep">前往 ② 照片校正 ➡️</button>
+    </div>
+  </footer>
+
+  <!-- ==================== 彈出視窗 1：網站右上角 QR Code ==================== -->
+  <div class="modal-backdrop" id="qrModal" role="dialog" aria-modal="true" aria-labelledby="qrModalTitle">
+    <div class="modal-card" style="max-width:460px;text-align:center;">
+      <h2 id="qrModalTitle" style="font-size:1.4rem;font-weight:900;margin-bottom:6px;">📱 智慧考卷 OCR 掃描器 — 網站 QR Code</h2>
+      <p style="font-size:0.95rem;color:var(--text-muted);margin-bottom:16px;">
+        請使用 iPad、Android 平板或手機相機掃描下方 QR Code，無須登入任何 AI 帳號即可直接開啟網站使用！
+      </p>
+      <div style="background:#f8fafc;border:2px solid #e2e8f0;border-radius:16px;padding:18px;display:inline-block;margin-bottom:16px;">
+        <canvas id="qrCodeCanvas" width="270" height="270" style="max-width:100%;height:auto;"></canvas>
+      </div>
+      <div style="margin-bottom:16px;text-align:left;">
+        <label class="field-label">🌐 公開 HTTPS 網站網址：</label>
+        <div style="display:flex;gap:8px;">
+          <input type="text" id="qrSiteUrlInput" class="input-text" readonly value="https://liniris1023.github.io/smart-exam-ocr/" />
+          <button type="button" class="btn btn-sm btn-primary" id="btnCopySiteUrl" style="flex-shrink:0;">📋 複製網址</button>
+        </div>
+      </div>
+      <button type="button" class="btn btn-outline" id="btnCloseQr" style="width:100%;">✖ 關閉視窗</button>
+    </div>
+  </div>
+
+  <!-- ==================== 彈出視窗 2：閱讀順序預覽與語音試聽 ==================== -->
+  <div class="modal-backdrop" id="readingOrderModal" role="dialog" aria-modal="true">
+    <div class="modal-card">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
+        <h2 style="font-size:1.3rem;font-weight:900;">👁️ 最終閱讀順序預覽（確認報讀順序是否正確）</h2>
+        <div style="display:flex;gap:8px;">
+          <button type="button" class="btn btn-sm btn-accent" id="btnSpeakPreview">🔊 語音試聽報讀順序</button>
+          <button type="button" class="btn btn-sm btn-outline" id="btnCloseReadingPreview">✖ 關閉</button>
+        </div>
+      </div>
+      <pre id="readingOrderBody" style="background:#f8fafc;border:2px solid #cbd5e1;border-radius:12px;padding:16px;max-height:60vh;overflow:auto;white-space:pre-wrap;font-size:1.05rem;line-height:1.7;"></pre>
+    </div>
+  </div>
+
+  <!-- ==================== 彈出視窗 3：平板 WebRTC 即時相機取景 ==================== -->
+  <div class="modal-backdrop" id="cameraModal" role="dialog" aria-modal="true">
+    <div class="modal-card" style="max-width:760px;text-align:center;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+        <h2 style="font-size:1.25rem;font-weight:900;">📷 平板相機直接拍攝紙本考卷</h2>
+        <button type="button" class="btn btn-sm btn-outline" id="btnCloseCamera">✖ 關閉相機</button>
+      </div>
+      <div style="position:relative;background:#000;border-radius:14px;overflow:hidden;margin-bottom:14px;">
+        <video id="cameraVideo" playsinline autoplay muted style="width:100%;max-height:62vh;display:block;"></video>
+        <div style="position:absolute;inset:24px;border:3px dashed rgba(45,212,191,0.85);border-radius:12px;pointer-events:none;"></div>
+      </div>
+      <div style="display:flex;justify-content:center;gap:12px;flex-wrap:wrap;">
+        <button type="button" class="btn btn-outline" id="btnSwitchCamera">🔄 切換前後鏡頭</button>
+        <button type="button" class="btn btn-primary" id="btnCapturePhoto" style="min-width:200px;font-size:1.15rem;">📸 按下快門拍攝考卷</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast 通知 -->
+  <div id="toastMsg" class="toast-msg" role="status" aria-live="polite"></div>
+
+  <!-- 核心引擎與應用程式腳本 -->
+  <script src="./ocr-layout.js"></script>
+  <script src="./pdf-engine.js"></script>
+  <script src="./sample-exams.js"></script>
+  <script src="./app.js"></script>
+</body>
+</html>
